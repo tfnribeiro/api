@@ -131,6 +131,7 @@ class NoiseGenerator():
             if verbose: print(f"Heap found for 't_confusion' : {heap}")
             while len(confusion_set) < number_of_words and len(heap) > 0:
                 word_to_add = heapq.heappop(heap)[1]
+
                 if word_to_add.lower() not in confusion_set:
                     confusion_set.append(word_to_add)
         
@@ -141,8 +142,25 @@ class NoiseGenerator():
         }
         return result
     
-    def generate_confusion_words(self, sentence, number_of_words=2, student_words=[], verbose=False):
-        return self._conf_generate_confusion_words(sentence, number_of_words, student_words, verbose)
+    def generate_confusion_words(self, sentence, words_to_select=2, 
+                                 n_confusion_per_selected_word=1, 
+                                 student_words=[], verbose=False):
+        confusion_words = [self._conf_generate_confusion_words(sentence, 
+                                                               n_confusion_per_selected_word, 
+                                                               student_words, verbose) for _ in range(words_to_select)]
+        results_combined = {
+            "confusion_words": [],
+            "pos_picked" : [],
+            "word_used" : [],
+        }
+        for d in confusion_words:
+            for k, v in d.items():
+                if k == "confusion_words":
+                    results_combined[k].extend(v)
+                    continue
+                if k not in results_combined[k]:
+                    results_combined[k].append(v)
+        return results_combined
   
     def replace_sent_with_noise(self, sentence, number_of_mistakes=1, number_of_words=2, verbose=False):
         id_used = dict()
