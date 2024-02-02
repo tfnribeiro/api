@@ -6,6 +6,7 @@ from flask import request
 
 from zeeguu.core.nlp_pipeline import SpacyWrappers, NoiseWordsGenerator
 from zeeguu.core.nlp_pipeline import AutoGECTagging, ContextReducer
+from rapidfuzz.distance import Levenshtein
 
 
 # ---------------------------------------------------------------------------
@@ -100,3 +101,14 @@ def get_smaller_context():
                                                                  bookmark_word, new_context_max_len)
 
     return json_result(shorter_context)
+
+# ---------------------------------------------------------------------------
+@api.route("/get_levenshtein_dist", methods=("POST",))
+# ---------------------------------------------------------------------------
+@cross_domain
+@with_session
+def get_levenshtein_dist():
+    source_word = request.form.get("source_word", "")
+    target_word = request.form.get("target_word", "")
+    result = Levenshtein.editops(source_word, target_word)
+    return json_result(result)
