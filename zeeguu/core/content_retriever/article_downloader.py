@@ -15,8 +15,7 @@ from zeeguu.logging import log, logp
 from zeeguu.core import model
 from zeeguu.core.content_quality.quality_filter import sufficient_quality
 from zeeguu.core.emailer.zeeguu_mailer import ZeeguuMailer
-from zeeguu.core.model import Url, RSSFeed, LocalizedTopic
-from langdetect import detect
+from zeeguu.core.model import Url, Feed, LocalizedTopic
 import requests
 
 from zeeguu.core.model.article import MAX_CHAR_COUNT_IN_SUMMARY
@@ -40,8 +39,10 @@ class SkippedForLowQuality(Exception):
     def __init__(self, reason):
         self.reason = reason
 
+
 class SkippedForLanguageMismatch(Exception):
     pass
+
 
 class SkippedAlreadyInDB(Exception):
     pass
@@ -70,7 +71,7 @@ def banned_url(url):
     return False
 
 
-def download_from_feed(feed: RSSFeed, session, limit=1000, save_in_elastic=True):
+def download_from_feed(feed: Feed, session, limit=1000, save_in_elastic=True):
     """
 
     Session is needed because this saves stuff to the DB.
@@ -119,7 +120,7 @@ def download_from_feed(feed: RSSFeed, session, limit=1000, save_in_elastic=True)
             continue
 
         if (not last_retrieval_time_seen_this_crawl) or (
-                feed_item_timestamp > last_retrieval_time_seen_this_crawl
+            feed_item_timestamp > last_retrieval_time_seen_this_crawl
         ):
             last_retrieval_time_seen_this_crawl = feed_item_timestamp
 
@@ -221,7 +222,7 @@ def download_feed_item(session, feed, feed_item, url):
 
         if article_detected_lang != feed.language.code:
             raise SkippedForLanguageMismatch
-        
+
         if not is_quality_article:
             raise SkippedForLowQuality(reason)
 
@@ -283,8 +284,10 @@ def download_feed_item(session, feed, feed_item, url):
         logp(f"Data error for: {url}")
 
     except requests.exceptions.Timeout:
-        logp(f"The request from the server was timed out after {TIMEOUT_SECONDS} seconds.")
-        
+        logp(
+            f"The request from the server was timed out after {TIMEOUT_SECONDS} seconds."
+        )
+
     except Exception as e:
         import traceback
 
@@ -303,7 +306,7 @@ def add_topics(new_article, session):
     topics = []
     for loc_topic in LocalizedTopic.query.all():
         if loc_topic.language == new_article.language and loc_topic.matches_article(
-                new_article
+            new_article
         ):
             topics.append(loc_topic.topic.title)
             new_article.add_topic(loc_topic.topic)
