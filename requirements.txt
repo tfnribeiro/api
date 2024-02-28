@@ -51,3 +51,4 @@ flask_monitoringdashboard
 
 # spacy sometimes pulls an older version of pydantic that breaks stuff; adding the following line to prevent this
 pydantic>=1.10.8
+sentence-transformers

@@ -18,18 +18,18 @@ def array_of_lowercase_topics(topics):
 
 
 def build_elastic_recommender_query(
-        count,
-        topics,
-        unwanted_topics,
-        user_topics,
-        unwanted_user_topics,
-        language,
-        upper_bounds,
-        lower_bounds,
-        es_scale="3d",
-        es_decay=0.8,
-        es_weight=4.2,
-        second_try=False,
+    count,
+    topics,
+    unwanted_topics,
+    user_topics,
+    unwanted_user_topics,
+    language,
+    upper_bounds,
+    lower_bounds,
+    es_scale="3d",
+    es_decay=0.8,
+    es_weight=4.2,
+    second_try=False,
 ):
     """
 
@@ -129,19 +129,19 @@ def build_elastic_recommender_query(
 
 
 def build_elastic_search_query(
-        count,
-        search_terms,
-        topics,
-        unwanted_topics,
-        user_topics,
-        unwanted_user_topics,
-        language,
-        upper_bounds,
-        lower_bounds,
-        es_scale="3d",
-        es_decay=0.8,
-        es_weight=4.2,
-        second_try=False,
+    count,
+    search_terms,
+    topics,
+    unwanted_topics,
+    user_topics,
+    unwanted_user_topics,
+    language,
+    upper_bounds,
+    lower_bounds,
+    es_scale="3d",
+    es_decay=0.8,
+    es_weight=4.2,
+    second_try=False,
 ):
     """
     Builds an elastic search query for search terms.
@@ -155,6 +155,52 @@ def build_elastic_search_query(
         .query(Q("match", title=search_terms) | Q("match", content=search_terms))
         .filter("term", language=language.name.lower())
         .exclude("match", description="pg15")
+    )
+
+    if not second_try:
+        s = s.filter("range", fk_difficulty={"gte": lower_bounds, "lte": upper_bounds})
+
+    # using function scores to weight more recent results higher
+    # https://github.com/elastic/elasticsearch-dsl-py/issues/608
+    weighted_query = Q(
+        "function_score",
+        query=s.query,
+        functions=[
+            SF("gauss", published_time={"scale": "30d", "offset": "7d", "decay": 0.3})
+        ],
+    )
+
+    query = {"size": count, "query": weighted_query.to_dict()}
+
+    return query
+
+
+def build_elastic_semantic_sim_query(
+    count,
+    search_terms,
+    topics,
+    unwanted_topics,
+    user_topics,
+    unwanted_user_topics,
+    language,
+    upper_bounds,
+    lower_bounds,
+    article_sem_vec,
+    es_scale="3d",
+    es_decay=0.8,
+    es_weight=4.2,
+    second_try=False,
+    k=5,
+):
+    """
+    Builds an elastic search based on the KNN semantic embeddings, the filter can be a query object.
+    """
+    s = Search().knn(
+        field="semantic_embedding",
+        k=k,
+        num_candidates=count,
+        query_vector=article_sem_vec,
+        filter=Q("term", language=language.name.lower()),
     )
 
     if not second_try:
