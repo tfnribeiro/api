@@ -70,12 +70,12 @@ class Bookmark(db.Model):
     bookmark = db.relationship("WordToStudy", backref="bookmark", passive_deletes=True)
 
     def __init__(
-            self,
-            origin: UserWord,
-            translation: UserWord,
-            user: "User",
-            text: str,
-            time: datetime,
+        self,
+        origin: UserWord,
+        translation: UserWord,
+        user: "User",
+        text: str,
+        time: datetime,
     ):
         self.origin = origin
         self.translation = translation
@@ -130,12 +130,12 @@ class Bookmark(db.Model):
             session.add(self)
 
     def add_new_exercise_result(
-            self,
-            exercise_source: ExerciseSource,
-            exercise_outcome: ExerciseOutcome,
-            exercise_solving_speed,
-            session_id: int,
-            other_feedback="",
+        self,
+        exercise_source: ExerciseSource,
+        exercise_outcome: ExerciseOutcome,
+        exercise_solving_speed,
+        session_id: int,
+        other_feedback="",
     ):
         exercise = Exercise(
             exercise_outcome,
@@ -152,13 +152,13 @@ class Bookmark(db.Model):
         return exercise
 
     def report_exercise_outcome(
-            self,
-            exercise_source: str,
-            exercise_outcome: str,
-            solving_speed,
-            session_id,
-            other_feedback,
-            db_session,
+        self,
+        exercise_source: str,
+        exercise_outcome: str,
+        solving_speed,
+        session_id,
+        other_feedback,
+        db_session,
     ):
         from zeeguu.core.model import UserExerciseSession
 
@@ -206,6 +206,20 @@ class Bookmark(db.Model):
 
                 capture_exception(e)
                 print(f"could not find article title for bookmark with id: {self.id}")
+                # Fetch the BasicSRSchedule instance associated with the current bookmark
+        from zeeguu.core.model import BasicSRSchedule
+        from zeeguu.core.word_scheduling.basicSR.basicSR import (
+            MAX_INTERVAL_8_DAY,
+            ONE_DAY,
+        )
+
+        try:
+            basic_sr_schedule = BasicSRSchedule.query.filter(
+                BasicSRSchedule.bookmark_id == self.id
+            ).one()
+            cooling_interval = basic_sr_schedule.cooling_interval // ONE_DAY
+        except sqlalchemy.exc.NoResultFound:
+            cooling_interval = None
 
         result = dict(
             id=self.id,
@@ -222,8 +236,10 @@ class Bookmark(db.Model):
             created_day=created_day,  # human readable stuff...
             time=datetime_to_json(self.time),
             fit_for_study=self.fit_for_study == 1,
+            cooling_interval=cooling_interval,
+            is_last_in_cycle=cooling_interval == MAX_INTERVAL_8_DAY // ONE_DAY,
         )
-
+        
         if self.text.article:
             result["article_title"] = self.text.article.title
 
@@ -234,19 +250,19 @@ class Bookmark(db.Model):
 
     @classmethod
     def find_or_create(
-            cls,
-            session,
-            user,
-            _origin: str,
-            _origin_lang: str,
-            _translation: str,
-            _translation_lang: str,
-            _context: str,
-            article_id: int,
+        cls,
+        session,
+        user,
+        _origin: str,
+        _origin_lang: str,
+        _translation: str,
+        _translation_lang: str,
+        _context: str,
+        article_id: int,
     ):
         """
-            if the bookmark does not exist, it creates it and returns it
-            if it exists, it ** updates the translation** and returns the bookmark object
+        if the bookmark does not exist, it creates it and returns it
+        if it exists, it ** updates the translation** and returns the bookmark object
         """
 
         origin_lang = Language.find_or_create(_origin_lang)
