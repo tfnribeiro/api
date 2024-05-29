@@ -24,12 +24,18 @@ def main():
     feed_name = input(f"Feed name (Enter for: {test_feed.title}):  ") or test_feed.title
     print(f"= {feed_name}")
 
-    icon_name = input("Icon name to be found in resources folder (e.g. 20min.png):  ")
+    icon_name_from_feed = "_".join(feed_name.split()) + ".png"
+    icon_name = (
+        input(
+            f"Icon name to be found in resources folder (enter for {icon_name_from_feed}):  "
+        )
+        or icon_name_from_feed
+    )
     print(f"= {icon_name}")
 
     description = (
-            input(f"Description (Enter for: {test_feed.description}): ")
-            or test_feed.description
+        input(f"Description (Enter for: {test_feed.description}): ")
+        or test_feed.description
     )
     print(f"= {description}")
 
@@ -46,7 +52,7 @@ def main():
         description,
         icon_name=icon_name,
         language=language,
-        feed_type=feed_type
+        feed_type=feed_type,
     )
 
     print("Done: ")
