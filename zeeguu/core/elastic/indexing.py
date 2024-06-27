@@ -18,6 +18,22 @@ def find_topics(article_id, session):
     return topics.rstrip()
 
 
+def create_or_update_bulk_docs(article, session):
+    es = Elasticsearch(ES_CONN_STRING)
+
+    doc_data = document_from_article(article, session)
+    doc = {}
+    doc["_id"] = article.id
+    doc["_index"] = ES_ZINDEX
+    doc["_source"] = doc_data
+    if es.exists(index=ES_ZINDEX, id=article.id):
+        doc["_op_type"] = "update"
+    else:
+        doc["_op_type"] = "create"
+
+    return doc
+
+
 def document_from_article(article, session):
     topics = find_topics(article.id, session)
 
