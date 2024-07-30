@@ -4,8 +4,10 @@ from zeeguu.core.content_recommender import (
     article_recommendations_for_user,
     topic_filter_for_user,
     content_recommendations,
+    find_articles_like,
 )
 from zeeguu.core.model import UserArticle, Article, PersonalCopy, User
+from zeeguu.core.content_recommender.elastic_recommender import find_articles_like
 
 from zeeguu.api.utils.route_wrappers import cross_domain, requires_session
 from zeeguu.api.utils.json_result import json_result
@@ -112,6 +114,41 @@ def user_articles_cohort():
     """
     user = User.find_by_id(flask.g.user_id)
     return json_result(user.cohort_articles_for_user())
+
+
+# ---------------------------------------------------------------------------
+@api.route("/get_similar_articles", methods=("GET",))
+# ---------------------------------------------------------------------------
+@cross_domain
+@requires_session
+def similar_articles_to_article():
+    user = User.find_by_id(flask.g.user_id)
+    article_id = request.args.get("article_id", "")
+    print(request.args)
+    rel_difficulty = request.args.get("rel_dif", 3)
+    if rel_difficulty == "undefined":
+        rel_difficulty = 3
+    else:
+        rel_difficulty = int(rel_difficulty)
+    article = Article.find_by_id(article_id)
+    print("Giving similar articles!")
+    try:
+        articles = find_articles_like(
+            [article_id],
+            2,
+            365,
+            article.language_id,
+            article.fk_difficulty,
+            rel_difficulty,
+        )
+    except Exception as e:
+        print(e)
+        capture_exception(e)
+        # Usually no recommendations when the user has not liked any articles
+        articles = []
+    article_infos = [UserArticle.user_article_info(user, a) for a in articles]
+
+    return json_result(article_infos)
 
 
 # ---------------------------------------------------------------------------

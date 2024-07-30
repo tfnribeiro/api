@@ -274,17 +274,20 @@ def _difficuty_level_bounds(level):
     return lower_bounds, upper_bounds
 
 
-def __find_articles_like(
-    recommended_articles_ids: "list[int]",
+def find_articles_like(
+    articles_to_find_alike: "list[int]",
     limit: int,
     article_age: int,
     language_id: int,
+    relative_difficulty_reference: int = 50,
+    relative_difficulty: int = 3,
+    min_similarity_score: float = 20,
 ) -> "list[Article]":
     es = Elasticsearch(ES_CONN_STRING)
     fields = ["content", "title"]
     language = Language.find_by_id(language_id)
     like_documents = [
-        {"_index": ES_ZINDEX, "_id": str(doc_id)} for doc_id in recommended_articles_ids
+        {"_index": ES_ZINDEX, "_id": str(doc_id)} for doc_id in articles_to_find_alike
     ]
 
     mlt_query = build_elastic_more_like_this_query(
@@ -292,10 +295,20 @@ def __find_articles_like(
         like_documents=like_documents,
         similar_to=fields,
         cutoff_days=article_age,
+        relative_difficulty_reference=relative_difficulty_reference,
+        relative_difficulty=relative_difficulty,
     )
+    from pprint import pprint
+
+    pprint(mlt_query)
 
     res = es.search(index=ES_ZINDEX, body=mlt_query, size=limit)
-    articles = _to_articles_from_ES_hits(res["hits"]["hits"])
+    articles_found = res["hits"]["hits"]
+    print([hit["_score"] for hit in articles_found])
+    articles_found = [
+        hit for hit in articles_found if hit["_score"] > min_similarity_score
+    ]
+    articles = _to_articles_from_ES_hits(articles_found)
     articles = [a for a in articles if a.broken == 0]
     return articles
 
@@ -308,5 +321,5 @@ def content_recommendations(user_id: int, language_id: int):
         if article.article.language_id == language_id:
             user_likes.append(article.article_id)
 
-    articles_to_recommend = __find_articles_like(user_likes, 20, 50, language_id)
+    articles_to_recommend = find_articles_like(user_likes, 20, 50, language_id)
     return articles_to_recommend

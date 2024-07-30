@@ -29,7 +29,7 @@ def build_elastic_recommender_query(
     upper_bounds,
     lower_bounds,
     es_scale="30d",
-    es_offset="1d",
+    es_offset="0d",
     es_decay=0.5,
     es_weight=2.1,
     page=0,
@@ -203,9 +203,27 @@ def build_elastic_more_like_this_query(
     scale: str = "10d",
     offset: str = "4h",
     decay: float = 0.9,
+    relative_difficulty_reference: int = 50,
+    relative_difficulty: int = 3,
 ):
 
     cutoff_date = datetime.now() - timedelta(days=cutoff_days)
+    relative_difficulty_query = {
+        "range": {
+            "fk_difficulty": {
+                "gt": 0,
+                "lt": 100,
+            }
+        }
+    }
+    if relative_difficulty == 5:
+        relative_difficulty_query["range"]["fk_difficulty"][
+            "lt"
+        ] = relative_difficulty_reference
+    elif relative_difficulty == 1:
+        relative_difficulty_query["range"]["fk_difficulty"][
+            "gt"
+        ] = relative_difficulty_reference
 
     query = {
         "query": {
@@ -235,7 +253,8 @@ def build_elastic_more_like_this_query(
                                                 "lte": "now",
                                             }
                                         }
-                                    }
+                                    },
+                                    relative_difficulty_query,
                                 ]
                             }
                         },
@@ -253,7 +272,6 @@ def build_elastic_more_like_this_query(
                         }
                     }
                 ],
-                "score_mode": "sum",
             }
         }
     }
