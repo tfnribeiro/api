@@ -71,7 +71,14 @@ def main():
                 print(f"fail for: '{article.id}', {e}")
 
     # Get All the IDs
-    all_article_ids = np.array([a_id[0] for a_id in db_session.query(Article.id).all()])
+    all_article_ids = np.array(
+        [
+            a_id[0]
+            for a_id in db_session.query(Article.id)
+            .all()
+        ]
+    )
+    # Filter can be used to retrieve specific language.
     print(f"Total Articles in DB: {len(all_article_ids)}")
     # Filter out those not in ES
     print("Filtering out articles already in ES.")
