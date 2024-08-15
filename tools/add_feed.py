@@ -8,9 +8,10 @@ app = create_app()
 app.app_context().push()
 
 
-def create_and_test_feed(url: str, feed_type: int):
+def create_and_test_feed(url: str, feed_type: int, skip_feed_health=True):
     feed = Feed.from_url(url, feed_type=feed_type)
-    print(feed.feed_health_info())
+    if not skip_feed_health:
+        print(feed.feed_health_info())
 
     return feed
 
