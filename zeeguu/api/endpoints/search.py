@@ -1,4 +1,5 @@
 import flask
+from zeeguu.api.utils.abort_handling import make_error
 from zeeguu.logging import log
 from flask import request
 from zeeguu.core.model.search import Search
@@ -24,6 +25,8 @@ SUBSCRIBED_SEARCHES = "subscribed_searches"
 FILTER_SEARCH = "filter_search"
 UNFILTER_SEARCH = "unfilter_search"
 FILTERED_SEARCHES = "filtered_searches"
+SUBSCRIBE_TO_EMAIL_SEARCH = "subscribe_to_email_search"
+UNSUBSCRIBE_FROM_EMAIL_SEARCH = "unsubscribe_from_email_search"
 
 
 # ---------------------------------------------------------------------------
@@ -44,9 +47,12 @@ def subscribe_to_search(search_terms):
     """
     search = Search.find_or_create(db_session, search_terms)
     user = User.find_by_id(flask.g.user_id)
-    SearchSubscription.find_or_create(user, search)
+    receive_email = False
+    subscription = SearchSubscription.find_or_create(
+        db_session, user, search, receive_email
+    )
 
-    return json_result(search.as_dictionary())
+    return json_result(subscription.as_dictionary())
 
 
 # ---------------------------------------------------------------------------
@@ -66,8 +72,11 @@ def unsubscribe_from_search():
     try:
         to_delete = SearchSubscription.with_search_id(search_id, user)
         db_session.delete(to_delete)
-        to_delete2 = Search.find_by_id(search_id)
-        db_session.delete(to_delete2)
+
+        search = Search.find_by_id(search_id)
+        total_subscribers = SearchSubscription.get_number_of_subscribers(search_id)
+        if total_subscribers == 0:
+            db_session.delete(search)
         db_session.commit()
 
     except Exception as e:
@@ -101,7 +110,7 @@ def get_subscribed_searches():
 
     for subs in subscriptions:
         try:
-            searches_list.append(subs.search.as_dictionary())
+            searches_list.append(subs.as_dictionary())
         except Exception as e:
             log(str(e))
             from sentry_sdk import capture_exception
@@ -212,3 +221,41 @@ def search_for_search_terms(search_terms, page: int = 0):
     article_infos = [UserArticle.user_article_info(user, a) for a in articles]
 
     return json_result(article_infos)
+
+
+@api.route(f"/{SUBSCRIBE_TO_EMAIL_SEARCH}/<search_terms>", methods=("GET",))
+# ---------------------------------------------------------------------------
+@cross_domain
+@requires_session
+def subscribe_to_email_search(search_terms):
+    """
+    A user can subscribe to email updates about a search
+    """
+
+    search = Search.find(search_terms)
+    user = User.find_by_id(flask.g.user_id)
+    receive_email = True
+    subscription = SearchSubscription.update_receive_email(
+        db_session, user, search, receive_email
+    )
+
+    return json_result(subscription.as_dictionary())
+
+
+@api.route(f"/{UNSUBSCRIBE_FROM_EMAIL_SEARCH}/<search_terms>", methods=("GET",))
+# ---------------------------------------------------------------------------
+@cross_domain
+@requires_session
+def unsubscribe_from_email_search(search_terms):
+    """
+    A user can unsubscribe to email updates about a search
+    """
+
+    search = Search.find(search_terms)
+    user = User.find_by_id(flask.g.user_id)
+    receive_email = False
+    subscription = SearchSubscription.update_receive_email(
+        db_session, user, search, receive_email
+    )
+
+    return json_result(subscription.as_dictionary())

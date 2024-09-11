@@ -8,9 +8,8 @@ from wordstats import Word
 
 from zeeguu.logging import log
 from zeeguu.core.bookmark_quality.fit_for_study import fit_for_study
-from zeeguu.core.definition_of_learned import is_learned_based_on_exercise_outcomes
+
 from zeeguu.core.model import Article
-from zeeguu.core.model.sorted_exercise_log import SortedExerciseLog
 from zeeguu.core.model.exercise import Exercise
 from zeeguu.core.model.exercise_outcome import ExerciseOutcome
 from zeeguu.core.model.exercise_source import ExerciseSource
@@ -20,12 +19,11 @@ from zeeguu.core.model.user import User
 from zeeguu.core.model.user_word import UserWord
 from zeeguu.core.util.encoding import datetime_to_json
 from zeeguu.core.model.learning_cycle import LearningCycle
+from zeeguu.core.model.bookmark_user_preference import UserWordExPreference
 
 import zeeguu
 
 from zeeguu.core.model import db
-
-CORRECTS_IN_A_ROW_FOR_LEARNED = 4
 
 bookmark_exercise_mapping = Table(
     "bookmark_exercise_mapping",
@@ -70,6 +68,8 @@ class Bookmark(db.Model):
 
     learning_cycle = db.Column(db.Integer)
 
+    user_preference = db.Column(db.Integer)
+
     bookmark = db.relationship("WordToStudy", backref="bookmark", passive_deletes=True)
 
     def __init__(
@@ -90,6 +90,7 @@ class Bookmark(db.Model):
         self.fit_for_study = fit_for_study(self)
         self.learned = False
         self.learning_cycle = learning_cycle
+        self.user_preference = UserWordExPreference.NO_PREFERENCE
 
     def __repr__(self):
         return "Bookmark[{3} of {4}: {0}->{1} in '{2}...']\n".format(
@@ -216,10 +217,14 @@ class Bookmark(db.Model):
             ).one()
             cooling_interval = basic_sr_schedule.cooling_interval // ONE_DAY
             next_practice_time = basic_sr_schedule.next_practice_time
-            can_update_schedule = next_practice_time <= BasicSRSchedule.get_end_of_today()
+            can_update_schedule = (
+                next_practice_time <= BasicSRSchedule.get_end_of_today()
+            )
+            consecutive_correct_answers = basic_sr_schedule.consecutive_correct_answers
         except sqlalchemy.exc.NoResultFound:
             cooling_interval = None
             can_update_schedule = None
+            consecutive_correct_answers = None
 
         bookmark_title = ""
         if with_title:
@@ -250,6 +255,8 @@ class Bookmark(db.Model):
             cooling_interval=cooling_interval,
             is_last_in_cycle=cooling_interval == MAX_INTERVAL_8_DAY // ONE_DAY,
             can_update_schedule=can_update_schedule,
+            user_preference=self.user_preference,
+            consecutive_correct_answers=consecutive_correct_answers,
         )
 
         if self.text.article:
@@ -311,6 +318,8 @@ class Bookmark(db.Model):
         return bookmark
 
     def sorted_exercise_log(self):
+        from zeeguu.core.model.sorted_exercise_log import SortedExerciseLog
+
         return SortedExerciseLog(self)
 
     @classmethod
@@ -354,16 +363,33 @@ class Bookmark(db.Model):
         except NoResultFound:
             return False
 
+    def is_learned_based_on_exercise_outcomes(self):
+        from zeeguu.core.model.sorted_exercise_log import SortedExerciseLog
+        from zeeguu.core.definition_of_learned import (
+            is_learned_based_on_exercise_outcomes,
+        )
+
+        exercise_log = SortedExerciseLog(self)
+        return is_learned_based_on_exercise_outcomes(
+            exercise_log, self.learning_cycle == LearningCycle.PRODUCTIVE
+        )
+
     def update_learned_status(self, session):
+        from zeeguu.core.definition_of_learned import (
+            is_learned_based_on_exercise_outcomes,
+        )
+        from zeeguu.core.model.sorted_exercise_log import SortedExerciseLog
+
         """
             To call when something happened to the bookmark,
              that requires it's "learned" status to be updated.
         :param session:
         :return:
         """
-
         exercise_log = SortedExerciseLog(self)
-        is_learned = is_learned_based_on_exercise_outcomes(exercise_log)
+        is_learned = is_learned_based_on_exercise_outcomes(
+            exercise_log, self.learning_cycle == LearningCycle.PRODUCTIVE
+        )
         if is_learned:
             log(f"Log: {exercise_log.summary()}: bookmark {self.id} learned!")
             self.learned_time = exercise_log.last_exercise_time()
