@@ -138,8 +138,10 @@ api_mux_translators = APIMultiplexer(
     api_list=[
         GoogleTranslateWithContext(),
         GoogleTranslateWithoutContext(),
-        MicrosoftTranslateWithContext(),
-        MicrosoftTranslateWithoutContext(),
+        # Microsoft is currently not working as 09/12/2024
+        #  - Disabling them to see if the translation time is better
+        #    MicrosoftTranslateWithContext(),
+        #    MicrosoftTranslateWithoutContext(),
     ],
     config_filepath=os.environ.get("API_MUX_CONFIG__TRANSLATORS", ""),
 )
