@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 
 from zeeguu.core.model.topic import Topic
 from zeeguu.core.model.user import User
+from zeeguu.core.model.language import Language
 import sqlalchemy
 
 import zeeguu.core

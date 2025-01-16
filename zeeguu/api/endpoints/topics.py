@@ -83,17 +83,22 @@ def get_subscribed_topics():
     A user might be subscribed to multiple topics at once.
     This endpoint returns them as a list.
 
-    :return: a json list with feeds for which the user is registered;
+    :return: a json list with feeds for which the user is registered as long as it exists
+        in the language the user is studying. It might not exists due to not being crawled
+        often.
      every feed in this list is a dictionary with the following info:
                 id = unique id of the topic;
                 title = <unicode string>
     """
     user = User.find_by_id(flask.g.user_id)
     subscriptions = TopicSubscription.all_for_user(user)
+    user_learning_language = Language.find_by_id(user.learned_language_id)
+    topics = set([t.id for t in Topic.get_all_topics(user_learning_language)])
     topic_list = []
     for sub in subscriptions:
         try:
-            topic_list.append(sub.topic.as_dictionary())
+            if sub.topic_id in topics:
+                topic_list.append(sub.topic.as_dictionary())
         except Exception as e:
             from sentry_sdk import capture_exception
 
